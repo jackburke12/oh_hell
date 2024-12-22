@@ -18,11 +18,11 @@ class Card:
             return 0
 
 class Deck:
-    def __init__(self):
-        self.deck = []
-        self.deck_backup = []
+    deck = []
+    deck_backup = []
 
-    def create_deck(self):
+    def __init__(self):
+        self.deck.clear()
         suits = ['hearts', 'diamonds', 'clubs', 'spades']
         values = [2,3,4,5,6,7,8,9,10,11,12,13,14]
         names = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King', 'Ace']
@@ -33,39 +33,129 @@ class Deck:
                 card = Card(card_id, suit, names[i], values[i])
                 self.deck.append(card)
         self.deck_backup = copy.deepcopy(self.deck)
-
-    def get_card_ids(self):
-        ids = []
-        for card in self.deck:
-            ids.append(card.id)
-        return ids
     
     def shuffle(self):
         random.shuffle(self.deck)
 
-    #deal cards to each player, popping them from the end of the deck. When done, flip over the trump card and save it. Then, reset the deck.
     def deal(self, players, num_cards):
         for player in players:
             for i in range(num_cards):
                 player.add_to_hand(self.pop())
     
+    def get_trump_card(self):
+        return self.deck.pop()
+
+    #reset the deck to get a new, unshuffled deck to start each hand.
     def reset(self):
-        self.deck = self.deck_backup
+        self.deck = copy.deepcopy(self.deck_backup)
 
 class Game:
     num_players = 0
+    player_list = []
+    cards_played = {}
+    trump = None
+    first_bidder = None
+    dealer = None
+    tricks_left = None
+    hand_number = None
+    total_hands = None
+    total_bids = 0
+    plays = {}
 
-    def __init__(self, num_players = 5):
-        self.num_players = num_players
+    def __init__(self, player_list):
+        if len(player_list) == 5 | len(player_list) == 4:
+            self.total_hands = 10
+        elif len(player_list) == 6:
+            self.total_hands = 8
+        else:
+            print("Games must have 4, 5, or 6 players.")
+        self.num_players = len(player_list)
+        self.player_list = player_list 
+        self.tricks_left = self.hand_number
+        self.hand_number = self.total_hands
+        self.dealer = random.choice(self.player_list)
+        self.first_bidder = self.dealer.next_player
 
+    def play_hand(self,hand_number):
+        self.hand_number = hand_number
+        self.tricks_left = hand_number
+
+        game_deck = Deck()
+        game_deck.shuffle()
+        game_deck.deal(self.player_list, self.hand_number)
+        self.trump = game_deck.get_trump_card()
+        if self.trump.value == 14:
+            self.trump.suit = "no_trump"
+        
+        #bid loop
+        for player in self.player_list:
+            player.make_bid(self.trump)
+            self.total_bids += player.bid
+            
+
+
+    def simulate_game(self):
+        #play hands 10-1 loop
+            #create deck
+            #shuffle deck
+            #deal cards
+            #determine trump card
+            #bid loop
+                #first bidder bids
+                #last bid must fit condition total bids != total tricks
+            #determine first player
+            #play cards loop
+                #determine trick winner
+            #save trick results
+            #score hand
+            #update dealer
+
+        #play hands 2-10
+        for i in range(self.total_hands, 0, -1):
+            play_hand(i)
+        
+        #for i in range(1, self.total_hands, 1):
+            play_hand(i)
+
+        
 class Player:
+    name = ""
     hand = []
+    bid = None
+    next_player = None
+    is_dealer = False
+
+    def __init__(self, name):
+        self.name = name
 
     def add_to_hand(self,card):
         self.hand.append(card)
 
-newdeck = Deck()
-newdeck.create_deck()
-print(newdeck.get_card_ids())
-newdeck.shuffle()
-print(newdeck.get_card_ids())
+    def update_next_player(self, next_player):
+        self.next_player = next_player
+    
+    def make_bid(self, trump_suit):
+        trump_cards = 0
+        for card in self.hand():
+            if card.suit == trump_suit:
+                trump_cards += 1
+        self.bid = trump_cards
+    
+    def make_bid_no_trump(self):
+        high_cards = 0
+        for card in self.hand():
+            if card.value >= 10:
+                high_cards += 1
+        self.bid = high_cards
+
+player1 = Player("Jack")
+player2 = Player("Kelly")
+player3 = Player("Tim")
+player4 = Player("Mom")
+player5 = Player("Dad")
+
+player1.update_next_player(player2)
+player2.update_next_player(player3)
+player3.update_next_player(player4)
+player4.update_next_player(player5)
+player5.update_next_player(player1)
