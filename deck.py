@@ -40,7 +40,7 @@ class Deck:
     def deal(self, players, num_cards):
         for player in players:
             for i in range(num_cards):
-                player.add_to_hand(self.pop())
+                player.add_to_hand(self.deck.pop())
     
     def get_trump_card(self):
         return self.deck.pop()
@@ -64,7 +64,11 @@ class Game:
     hand_number = None
     total_hands = None
     total_bids = 0
+    scores = {}
     plays = {}
+    results = {}
+    tricks_won = {}
+    bids = {}
 
     def __init__(self, player_list):
         if len(player_list) == 5 or len(player_list) == 4:
@@ -75,12 +79,12 @@ class Game:
             print("Games must have 4, 5, or 6 players.")
         self.num_players = len(player_list)
         self.player_list = player_list 
-        self.tricks_left = self.hand_number
         self.hand_number = self.total_hands
+        self.tricks_left = self.hand_number
         self.dealer = random.choice(self.player_list)
         self.first_bidder = self.dealer.next_player
 
-    def play_hand(self,hand_number):
+    def play_hand(self,hand_number,updown):
         self.hand_number = hand_number
         self.tricks_left = hand_number
 
@@ -94,34 +98,58 @@ class Game:
         self.current_player = self.first_bidder
 
         while self.current_player != self.dealer:
-            self.current_player.make_bid(self.trump)
+            self.current_player.make_bid(self.trump, self.total_bids, self.hand_number)
             next_player = self.current_player.next_player
             self.total_bids += self.current_player.bid
             self.current_player = next_player
 
-        self.current_player.make_bid(self.trump)
+        self.current_player.make_bid(self.trump, self.total_bids, self.hand_number)
 
         #determine first bidder
         self.first_bidder = find_high_bidder(self.first_bidder)
         self.current_player = self.first_bidder
         self.last_player = self.current_player.previous_player
         #bids made, first player set to high bidder
-        #play the trick
-        while self.current_player != self.last_player:
-            card = determine_card_to_play(self.current_player)
-            self.cards_played.append((self.current_player,card))
-            next_player = self.current_player.next_player
-            self.current_player = next_player
-        
-        self.cards_played.append((self.current_player,determine_card_to_play(self.current_player)))
+        #play #tricks = hand number. 10 tricks are played for hand 10, 9 tricks for hand 9...
 
-        #check that all values are set/reset correctly
-        self.current_player = determine_trick_winner(self.cards_played)
-        self.current_player.tricks_won += 1
+        while self.tricks_left > 0:
+            #each player chooses a card to play, plays it, then play moves to the next player
+            #exit loop when you get to the last player
+            while self.current_player != self.last_player:
+                card = determine_card_to_play(self.current_player)
+                self.cards_played.append((self.current_player,card))
+                next_player = self.current_player.next_player
+                self.current_player = next_player
+            
+            #last player chooses a card and plays it
+            self.cards_played.append((self.current_player,determine_card_to_play(self.current_player)))
+
+            #first player for next hand becomes trick winner. Last player is player behind trick winner
+            self.current_player = determine_trick_winner(self.cards_played)
+            self.last_player = self.current_player.previous_player
+            self.current_player.tricks_won += 1
+            self.tricks_left -= 1
+
         self.hand_number -= 1
         self.game_deck.reset()
+        self.total_bids = 0
+        next_dealer = self.dealer.next_player
+        self.dealer = next_dealer
+        self.first_bidder = self.dealer.next_player
 
-    def simulate_game(self):
+        #score hand
+        for player in self.player_list:
+            if player.bid == player.tricks_won:
+                player.hand_score = 5 + player.tricks_won
+            else:
+                player.hand_score = 0
+            self.scores[player] = player.hand_score
+            self.tricks_won[player] = player.tricks_won
+            self.bids[player] = player.bid
+
+        #store results
+        self.results[str(hand_number)+updown] = {'cards_played':self.cards_played, 'hand_scores':self.scores,
+                                            'tricks_won':self.tricks_won, 'bids':self.bids}
         #play hands 10-1 loop
             #create deck
             #shuffle deck
@@ -138,13 +166,23 @@ class Game:
             #update dealer
 
         #play hands 2-10
-        for i in range(self.total_hands, 0, -1):
-            play_hand(i)
-        
-        #for i in range(1, self.total_hands, 1):
-            play_hand(i)
 
+class Simulator:
+    game = None
+
+    def __init__(self, player_list):
+        self.game = Game(player_list)
+
+    def play_game(self):
+        for i in range(10, 0, -1):
+            self.game.play_hand(i, "down")
         
+        for i in range(2,11,1):
+            self.game.play_hand(i, "up")
+
+        print(self.game.results)
+
+
 class Player:
     name = ""
     hand = []
@@ -153,6 +191,7 @@ class Player:
     previous_player = None
     is_dealer = False
     tricks_won = 0
+    hand_score = 0
 
     def __init__(self, name):
         self.name = name
@@ -164,12 +203,13 @@ class Player:
         self.next_player = next_player
         self.previous_player = previous_player
     
-    def make_bid(self, trump_suit, total_bids, tricks_left):
+    def make_bid(self, trump_suit, total_bids, total_tricks):
         self.bid = determine_bid(self.hand, trump_suit, self.is_dealer)
         ##need to add logic to adjust bid if dealer
-        if self.is_dealer and total_bids == tricks_left:
+        if self.is_dealer and total_bids == total_tricks:
             self.bid += 1
-    
+
+
 player1 = Player("Jack")
 player2 = Player("Kelly")
 player3 = Player("Tim")
@@ -181,3 +221,6 @@ player2.update_next_player(player3, player1)
 player3.update_next_player(player4, player2)
 player4.update_next_player(player5, player3)
 player5.update_next_player(player1, player4)
+
+sim1 = Simulator([player1,player2,player3,player4,player5])
+sim1.play_game()
