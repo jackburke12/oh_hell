@@ -1,6 +1,6 @@
 import random
 import copy
-from util import partition
+from util import partition, determine_bid, find_high_bidder, determine_card_to_play, determine_trick_winner
 
 class Card:
     def __init__(self, id, suit, name, value):
@@ -10,7 +10,7 @@ class Card:
         self.value = value
 
     def compare(self, card2):
-        if self.value > card2.value:
+        if self.value >= card2.value:
             return 1
         elif self.value < card2.value:
             return -1
@@ -50,11 +50,15 @@ class Deck:
         self.deck = copy.deepcopy(self.deck_backup)
 
 class Game:
+    game_deck = Deck()
     num_players = 0
     player_list = []
-    cards_played = {}
+    cards_played = []
+    current_player = None
+    last_player = None
     trump = None
     first_bidder = None
+    high_bidder = None
     dealer = None
     tricks_left = None
     hand_number = None
@@ -63,7 +67,7 @@ class Game:
     plays = {}
 
     def __init__(self, player_list):
-        if len(player_list) == 5 | len(player_list) == 4:
+        if len(player_list) == 5 or len(player_list) == 4:
             self.total_hands = 10
         elif len(player_list) == 6:
             self.total_hands = 8
@@ -80,19 +84,42 @@ class Game:
         self.hand_number = hand_number
         self.tricks_left = hand_number
 
-        game_deck = Deck()
-        game_deck.shuffle()
-        game_deck.deal(self.player_list, self.hand_number)
-        self.trump = game_deck.get_trump_card()
+        self.game_deck.shuffle()
+        self.game_deck.deal(self.player_list, self.hand_number)
+        self.trump = self.game_deck.get_trump_card()
         if self.trump.value == 14:
             self.trump.suit = "no_trump"
         
         #bid loop
-        for player in self.player_list:
-            player.make_bid(self.trump)
-            self.total_bids += player.bid
-            
+        self.current_player = self.first_bidder
 
+        while self.current_player != self.dealer:
+            self.current_player.make_bid(self.trump)
+            next_player = self.current_player.next_player
+            self.total_bids += self.current_player.bid
+            self.current_player = next_player
+
+        self.current_player.make_bid(self.trump)
+
+        #determine first bidder
+        self.first_bidder = find_high_bidder(self.first_bidder)
+        self.current_player = self.first_bidder
+        self.last_player = self.current_player.previous_player
+        #bids made, first player set to high bidder
+        #play the trick
+        while self.current_player != self.last_player:
+            card = determine_card_to_play(self.current_player)
+            self.cards_played.append((self.current_player,card))
+            next_player = self.current_player.next_player
+            self.current_player = next_player
+        
+        self.cards_played.append((self.current_player,determine_card_to_play(self.current_player)))
+
+        #check that all values are set/reset correctly
+        self.current_player = determine_trick_winner(self.cards_played)
+        self.current_player.tricks_won += 1
+        self.hand_number -= 1
+        self.game_deck.reset()
 
     def simulate_game(self):
         #play hands 10-1 loop
@@ -123,7 +150,9 @@ class Player:
     hand = []
     bid = None
     next_player = None
+    previous_player = None
     is_dealer = False
+    tricks_won = 0
 
     def __init__(self, name):
         self.name = name
@@ -131,31 +160,24 @@ class Player:
     def add_to_hand(self,card):
         self.hand.append(card)
 
-    def update_next_player(self, next_player):
+    def update_next_player(self, next_player, previous_player):
         self.next_player = next_player
+        self.previous_player = previous_player
     
-    def make_bid(self, trump_suit):
-        trump_cards = 0
-        for card in self.hand():
-            if card.suit == trump_suit:
-                trump_cards += 1
-        self.bid = trump_cards
+    def make_bid(self, trump_suit, total_bids, tricks_left):
+        self.bid = determine_bid(self.hand, trump_suit, self.is_dealer)
+        ##need to add logic to adjust bid if dealer
+        if self.is_dealer and total_bids == tricks_left:
+            self.bid += 1
     
-    def make_bid_no_trump(self):
-        high_cards = 0
-        for card in self.hand():
-            if card.value >= 10:
-                high_cards += 1
-        self.bid = high_cards
-
 player1 = Player("Jack")
 player2 = Player("Kelly")
 player3 = Player("Tim")
 player4 = Player("Mom")
 player5 = Player("Dad")
 
-player1.update_next_player(player2)
-player2.update_next_player(player3)
-player3.update_next_player(player4)
-player4.update_next_player(player5)
-player5.update_next_player(player1)
+player1.update_next_player(player2, player5)
+player2.update_next_player(player3, player1)
+player3.update_next_player(player4, player2)
+player4.update_next_player(player5, player3)
+player5.update_next_player(player1, player4)
