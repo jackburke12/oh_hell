@@ -18,11 +18,8 @@ class Card:
             return 0
 
 class Deck:
-    deck = []
-    deck_backup = []
-
     def __init__(self):
-        self.deck.clear()
+        self.deck = []
         suits = ['hearts', 'diamonds', 'clubs', 'spades']
         values = [2,3,4,5,6,7,8,9,10,11,12,13,14]
         names = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King', 'Ace']
@@ -39,10 +36,8 @@ class Deck:
 
     def deal(self, players, num_cards):
         for player in players:
-            print(player.name)
             for i in range(num_cards):
                 player.add_to_hand(self.deck.pop())
-                print(player.hand)
     
     def get_trump_card(self):
         return self.deck.pop()
@@ -52,23 +47,6 @@ class Deck:
         self.deck = copy.deepcopy(self.deck_backup)
 
 class Game:
-    game_deck = Deck()
-    current_player = None
-    last_player = None
-    trump = None
-    first_bidder = None
-    high_bidder = None
-    dealer = None
-    tricks_left = None
-    hand_number = None
-    total_hands = None
-    total_bids = 0
-    scores = {}
-    plays = {}
-    results = {}
-    tricks_won = {}
-    bids = {}
-
     def __init__(self, player_list):
         if len(player_list) == 5 or len(player_list) == 4:
             self.total_hands = 10
@@ -83,8 +61,19 @@ class Game:
         self.dealer = random.choice(self.player_list)
         self.dealer.is_dealer = True
         self.first_bidder = self.dealer.next_player
+        self.current_player = self.first_bidder
+        self.last_player = self.current_player.previous_player
+        self.trump = None
+        self.high_bidder = None
+        self.total_bids = 0
+        self.cards_played_trick = []
+        self.game_deck = Deck()
 
-        self.cards_played = []
+        self.bids = {}
+        self.cards_played_hand = {}
+        self.tricks_won = {}
+        self.scores = {}
+        self.results = {}
 
     def play_hand(self,hand_number,updown):
         self.hand_number = hand_number
@@ -99,13 +88,15 @@ class Game:
         #bid loop
         self.current_player = self.first_bidder
 
-        while self.current_player != self.dealer:
+        exit = True
+        first = self.current_player
+        while exit:
             self.current_player.make_bid(self.trump, self.total_bids, self.hand_number)
             next_player = self.current_player.next_player
             self.total_bids += self.current_player.bid
             self.current_player = next_player
-
-        self.current_player.make_bid(self.trump, self.total_bids, self.hand_number)
+            if self.current_player == first:
+                exit = False
 
         #find_high_bidder is working fine, bids are not being made. Understandable
         #determine first bidder
@@ -114,34 +105,48 @@ class Game:
         self.last_player = self.current_player.previous_player
         #bids made, first player set to high bidder
         #play #tricks = hand number. 10 tricks are played for hand 10, 9 tricks for hand 9...
-
         while self.tricks_left > 0:
             #each player chooses a card to play, plays it, then play moves to the next player
             #exit loop when you get to the last player
-            while self.current_player != self.last_player:
-                card = determine_card_to_play(self.current_player)
-                self.cards_played.append((self.current_player,card))
+
+            exit = True
+            first = self.current_player
+            while exit:
+                card = determine_card_to_play(self.current_player, self.cards_played_trick)
+                self.cards_played_trick.append((self.current_player,card))
                 next_player = self.current_player.next_player
                 self.current_player = next_player
-            
-            #last player chooses a card and plays it
-            self.cards_played.append((self.current_player,determine_card_to_play(self.current_player)))
+                if self.current_player == first:
+                    exit = False
 
             #first player for next hand becomes trick winner. Last player is player behind trick winner
-            self.current_player = determine_trick_winner(self.cards_played)
+            self.current_player = determine_trick_winner(self.cards_played_trick, self.trump)
             self.last_player = self.current_player.previous_player
             self.current_player.tricks_won += 1
-            self.tricks_left -= 1
 
+            self.cards_played_hand[self.tricks_left] = []
+
+            for player, card in self.cards_played_trick:
+                self.cards_played_hand[self.tricks_left].append((player.name,card.id))
+
+            self.tricks_left -= 1
+            #empty the cards played for the trick list after saving
+            self.cards_played_trick = []
+
+        #dealer for this hand is no longer the dealer
+        self.dealer.is_dealer = False
+        #Next hand will use one fewer card
         self.hand_number -= 1
+        #reset the game deck to 52 cards
         self.game_deck.reset()
-        self.cards_played = []
+        #reset total bids to 0
         self.total_bids = 0
+        #set dealer to player to the left of current dealer
         next_dealer = self.dealer.next_player
         next_dealer.is_dealer = True
         self.dealer = next_dealer
+        #set first_bidder to left of dealer
         self.first_bidder = self.dealer.next_player
-
 
         #score hand
         for player in self.player_list:
@@ -149,29 +154,13 @@ class Game:
                 player.hand_score = 5 + player.tricks_won
             else:
                 player.hand_score = 0
-            self.scores[player] = player.hand_score
-            self.tricks_won[player] = player.tricks_won
-            self.bids[player] = player.bid
+            self.scores[player.name] = player.hand_score
+            self.tricks_won[player.name] = player.tricks_won
+            self.bids[player.name] = player.bid
 
         #store results
-        self.results[str(hand_number)+updown] = {'cards_played':self.cards_played, 'hand_scores':self.scores,
+        self.results[str(hand_number)+updown] = {'cards_played':self.cards_played_hand, 'hand_scores':self.scores,
                                             'tricks_won':self.tricks_won, 'bids':self.bids}
-        #play hands 10-1 loop
-            #create deck
-            #shuffle deck
-            #deal cards
-            #determine trump card
-            #bid loop
-                #first bidder bids
-                #last bid must fit condition total bids != total tricks
-            #determine first player
-            #play cards loop
-                #determine trick winner
-            #save trick results
-            #score hand
-            #update dealer
-
-        #play hands 2-10
 
 class Simulator:
     def __init__(self, player_list):
@@ -207,7 +196,6 @@ class Player:
     
     def make_bid(self, trump_card, total_bids, total_tricks):
         self.bid = determine_bid(self.hand, trump_card, self.is_dealer)
-        print(self.bid)
         ##need to add logic to adjust bid if dealer
         if self.is_dealer and total_bids == total_tricks:
             self.bid += 1

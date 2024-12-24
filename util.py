@@ -30,23 +30,30 @@ def find_high_bidder(current_player):
         high_bidder = current_player
     return high_bidder
 
-def determine_card_to_play(current_player, cards_and_players, trump_card):
+def determine_card_to_play(current_player, cards_and_players):
+    #currently unused, but should be useful when improving this logic. Player may wish to play a lower card than what was led if 
+    # remaining tricks to take == 0, or if the number of high cards in their hand is greater than their remaining tricks to take
     remaining_tricks_to_take = current_player.bid - current_player.tricks_won
-    suit_led = cards_and_players[0][1].suit
-
-    card = check_if_suit_in_hand(current_player, suit_led)
-    if card:
-        return card
-    else:
+    #handle case where player is leading. Should add logic telling players what to lead. Right now, a random card is led
+    if len(cards_and_players) == 0:
         return current_player.hand.pop()
+    #check if player has the leading suit in their hand. If they do, return the first card whose suit matches the leading suit.
+    #Need to add logic so that player chooses the best card of the leading suit, not just the first one that appears
+    else:
+        suit_led = cards_and_players[0][1].suit
+        card = check_if_suit_in_hand(current_player, suit_led)
+        if card:
+            return card
+        else:
+            return current_player.hand.pop()
 
-def determine_trick_winner(cards_played, trump_suit):
+def determine_trick_winner(cards_played, trump_card):
     high_card = cards_played[0][1]
     High_card_player = cards_played[0][0]
 
     for player, card in cards_played:
-        if card.suit == trump_suit:
-            if high_card.suit == trump_suit:
+        if card.suit == trump_card.suit:
+            if high_card.suit == trump_card.suit:
                 if high_card.compare(card) < 0:
                     high_card = card
                     High_card_player = player
@@ -63,5 +70,7 @@ def determine_trick_winner(cards_played, trump_suit):
 def check_if_suit_in_hand(player, suit_led):
     for card in player.hand:
         if card.suit == suit_led:
-            return card
+            card1 = card
+            player.hand.remove(card)
+            return card1
     return None
