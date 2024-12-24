@@ -4,11 +4,11 @@
 def partition(lst, start, num_elements):
     return lst[start:num_elements]
 
-def determine_bid(hand, trump_suit, is_dealer):
+def determine_bid(hand, trump_card, is_dealer):
     bid = 0
-    if trump_suit != 'no_trump':
+    if trump_card.suit != 'no_trump':
         for card in hand:
-            if card.suit == trump_suit:
+            if card.suit == trump_card.suit:
                 bid += 1
     else: 
         for card in hand:
@@ -34,7 +34,7 @@ def determine_card_to_play(current_player, cards_and_players, trump_card):
     remaining_tricks_to_take = current_player.bid - current_player.tricks_won
     suit_led = cards_and_players[0][1].suit
 
-    card = check_if_suit_in_hand(current_player, trump_card.suit)
+    card = check_if_suit_in_hand(current_player, suit_led)
     if card:
         return card
     else:
@@ -60,8 +60,8 @@ def determine_trick_winner(cards_played, trump_suit):
                     High_card_player = player
     return High_card_player
 
-def check_if_suit_in_hand(player, trump_suit):
+def check_if_suit_in_hand(player, suit_led):
     for card in player.hand:
-        if card.suit == trump_suit:
+        if card.suit == suit_led:
             return card
     return None

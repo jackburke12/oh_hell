@@ -39,8 +39,10 @@ class Deck:
 
     def deal(self, players, num_cards):
         for player in players:
+            print(player.name)
             for i in range(num_cards):
                 player.add_to_hand(self.deck.pop())
+                print(player.hand)
     
     def get_trump_card(self):
         return self.deck.pop()
@@ -51,9 +53,6 @@ class Deck:
 
 class Game:
     game_deck = Deck()
-    num_players = 0
-    player_list = []
-    cards_played = []
     current_player = None
     last_player = None
     trump = None
@@ -82,7 +81,10 @@ class Game:
         self.hand_number = self.total_hands
         self.tricks_left = self.hand_number
         self.dealer = random.choice(self.player_list)
+        self.dealer.is_dealer = True
         self.first_bidder = self.dealer.next_player
+
+        self.cards_played = []
 
     def play_hand(self,hand_number,updown):
         self.hand_number = hand_number
@@ -105,6 +107,7 @@ class Game:
 
         self.current_player.make_bid(self.trump, self.total_bids, self.hand_number)
 
+        #find_high_bidder is working fine, bids are not being made. Understandable
         #determine first bidder
         self.first_bidder = find_high_bidder(self.first_bidder)
         self.current_player = self.first_bidder
@@ -132,10 +135,13 @@ class Game:
 
         self.hand_number -= 1
         self.game_deck.reset()
+        self.cards_played = []
         self.total_bids = 0
         next_dealer = self.dealer.next_player
+        next_dealer.is_dealer = True
         self.dealer = next_dealer
         self.first_bidder = self.dealer.next_player
+
 
         #score hand
         for player in self.player_list:
@@ -168,8 +174,6 @@ class Game:
         #play hands 2-10
 
 class Simulator:
-    game = None
-
     def __init__(self, player_list):
         self.game = Game(player_list)
 
@@ -184,17 +188,15 @@ class Simulator:
 
 
 class Player:
-    name = ""
-    hand = []
-    bid = None
-    next_player = None
-    previous_player = None
-    is_dealer = False
-    tricks_won = 0
-    hand_score = 0
-
     def __init__(self, name):
         self.name = name
+        self.hand = []
+        self.bid = 0
+        self.next_player = None
+        self.previous_player = None
+        self.is_dealer = False
+        self.tricks_won = 0
+        self.hand_score = 0
 
     def add_to_hand(self,card):
         self.hand.append(card)
@@ -203,8 +205,9 @@ class Player:
         self.next_player = next_player
         self.previous_player = previous_player
     
-    def make_bid(self, trump_suit, total_bids, total_tricks):
-        self.bid = determine_bid(self.hand, trump_suit, self.is_dealer)
+    def make_bid(self, trump_card, total_bids, total_tricks):
+        self.bid = determine_bid(self.hand, trump_card, self.is_dealer)
+        print(self.bid)
         ##need to add logic to adjust bid if dealer
         if self.is_dealer and total_bids == total_tricks:
             self.bid += 1
