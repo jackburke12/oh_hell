@@ -1,5 +1,6 @@
 import random
 import copy
+import pandas as pd
 from util import partition, determine_bid, find_high_bidder, determine_card_to_play, determine_trick_winner
 
 class Card:
@@ -47,15 +48,29 @@ class Deck:
         self.deck = copy.deepcopy(self.deck_backup)
 
 class Game:
-    def __init__(self, player_list):
-        if len(player_list) == 5 or len(player_list) == 4:
+    def __init__(self, player_names):
+        self.player_list = []
+        for name in player_names:
+            self.player_list.append(Player(name))
+
+        first = self.player_list[0]
+        last = self.player_list[-1]
+
+        for i, player in enumerate(self.player_list):
+            if player == first:
+                player.update_next_player(self.player_list[i+1],last)
+            elif player == last:
+                player.update_next_player(first,self.player_list[i-1])
+            else:
+                player.update_next_player(self.player_list[i+1],self.player_list[i-1])
+
+        if len(player_names) == 5 or len(player_names) == 4:
             self.total_hands = 10
-        elif len(player_list) == 6:
+        elif len(player_names) == 6:
             self.total_hands = 8
         else:
             print("Games must have 4, 5, or 6 players.")
-        self.num_players = len(player_list)
-        self.player_list = player_list 
+        self.num_players = len(player_names)
         self.hand_number = self.total_hands
         self.tricks_left = self.hand_number
         self.dealer = random.choice(self.player_list)
@@ -108,7 +123,6 @@ class Game:
         while self.tricks_left > 0:
             #each player chooses a card to play, plays it, then play moves to the next player
             #exit loop when you get to the last player
-
             exit = True
             first = self.current_player
             while exit:
@@ -148,33 +162,25 @@ class Game:
         #set first_bidder to left of dealer
         self.first_bidder = self.dealer.next_player
 
-        #score hand
+        #score hand and reset tricks won
         for player in self.player_list:
             if player.bid == player.tricks_won:
                 player.hand_score = 5 + player.tricks_won
             else:
                 player.hand_score = 0
             self.scores[player.name] = player.hand_score
+            player.running_score += player.hand_score
             self.tricks_won[player.name] = player.tricks_won
             self.bids[player.name] = player.bid
-
+            player.tricks_won = 0
+        
         #store results
         self.results[str(hand_number)+updown] = {'cards_played':self.cards_played_hand, 'hand_scores':self.scores,
                                             'tricks_won':self.tricks_won, 'bids':self.bids}
-
-class Simulator:
-    def __init__(self, player_list):
-        self.game = Game(player_list)
-
-    def play_game(self):
-        for i in range(10, 0, -1):
-            self.game.play_hand(i, "down")
-        
-        for i in range(2,11,1):
-            self.game.play_hand(i, "up")
-
-        print(self.game.results)
-
+        self.cards_played_hand = {}
+        self.scores = {}
+        self.tricks_won = {}
+        self.bids = {}
 
 class Player:
     def __init__(self, name):
@@ -186,6 +192,7 @@ class Player:
         self.is_dealer = False
         self.tricks_won = 0
         self.hand_score = 0
+        self.running_score = 0
 
     def add_to_hand(self,card):
         self.hand.append(card)
@@ -200,18 +207,35 @@ class Player:
         if self.is_dealer and total_bids == total_tricks:
             self.bid += 1
 
+class Simulator:
+    def play_game(self, player_names):
+        self.game = Game(player_names)
+        for i in range(10, 0, -1):
+            self.game.play_hand(i, "down")
+        
+        for i in range(2,11,1):
+            self.game.play_hand(i, "up")
 
-player1 = Player("Jack")
-player2 = Player("Kelly")
-player3 = Player("Tim")
-player4 = Player("Mom")
-player5 = Player("Dad")
+        for player in self.game.player_list:
+            print(f'{player.name}: {player.running_score}')
+    def export_results(self):
+        return self.game.results
 
-player1.update_next_player(player2, player5)
-player2.update_next_player(player3, player1)
-player3.update_next_player(player4, player2)
-player4.update_next_player(player5, player3)
-player5.update_next_player(player1, player4)
+sim = Simulator()
+sim.play_game(["Jack","Kelly","Tim","Mom","Dad"])
 
-sim1 = Simulator([player1,player2,player3,player4,player5])
-sim1.play_game()
+df = pd.DataFrame([sim.export_results()])
+
+save_path = r'output.csv'
+df.to_csv(save_path)
+# gamedata = []
+
+# for i in range(10):
+#     sim = Simulator()
+#     sim.play_game([player1,player2,player3,player4,player5])
+#     df = pd.DataFrame(sim.export_results())
+#     gamedata.append(df)
+
+# df = pd.concat(gamedata)
+
+# print(df.head())

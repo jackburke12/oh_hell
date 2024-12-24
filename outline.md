@@ -12,3 +12,11 @@ game
 player
 analyzer
 bidder
+
+from a trick:
+cards played
+
+from a hand:
+cards played
+player bids 
+player scores
