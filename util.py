@@ -74,3 +74,12 @@ def check_if_suit_in_hand(player, suit_led):
             player.hand.remove(card)
             return card1
     return None
+
+def unzip_card_played(player_and_card_tuple):
+    return (player_and_card_tuple[0].name,player_and_card_tuple[1].id)
+
+def unzip_cards_played_trick(cards_played_trick):
+    cards_played_trick_unzipped = []
+    for card_played in cards_played_trick:
+        cards_played_trick_unzipped.append(unzip_card_played(card_played))
+    return cards_played_trick_unzipped

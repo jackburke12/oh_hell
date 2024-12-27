@@ -1,7 +1,7 @@
 import random
 import copy
 import pandas as pd
-from util import partition, determine_bid, find_high_bidder, determine_card_to_play, determine_trick_winner
+from util import partition, determine_bid, find_high_bidder, determine_card_to_play, determine_trick_winner, unzip_card_played, unzip_cards_played_trick
 
 class Card:
     def __init__(self, id, suit, name, value):
@@ -89,6 +89,7 @@ class Game:
         self.tricks_won = {}
         self.scores = {}
         self.results = {}
+        self.play_data = []
 
     def play_hand(self,hand_number,updown):
         self.hand_number = hand_number
@@ -118,6 +119,9 @@ class Game:
         self.first_bidder = find_high_bidder(self.first_bidder)
         self.current_player = self.first_bidder
         self.last_player = self.current_player.previous_player
+
+        self.cards_played_hand[self.hand_number] = []
+
         #bids made, first player set to high bidder
         #play #tricks = hand number. 10 tricks are played for hand 10, 9 tricks for hand 9...
         while self.tricks_left > 0:
@@ -127,7 +131,24 @@ class Game:
             first = self.current_player
             while exit:
                 card = determine_card_to_play(self.current_player, self.cards_played_trick)
+                #add card to list of cards played this trick
                 self.cards_played_trick.append((self.current_player,card))
+                #add card to dict of cards played this hand
+                self.cards_played_hand[self.hand_number].append((self.current_player.name,card.id))
+                #after card is chosen, add all data informing that decision to the "play_data" list of dicitonaries
+                self.play_data.append(copy.deepcopy({"card_played":card.id,"hand_result":pd.NA, "player": self.current_player.name, "trump_card":self.trump.id,
+                                       "card_led":unzip_card_played(self.cards_played_trick[0]), "player_bid":self.current_player.bid,
+                                       "player_tricks_taken":self.current_player.tricks_won,"player_hand":self.current_player.get_hand(),
+                                       "total_bids":self.total_bids, "total_tricks_taken":self.hand_number-len(self.current_player.hand)-1,
+                                       "all_cards_played":self.cards_played_hand, "hand_number":self.hand_number,
+                                       "cards_played_trick":unzip_cards_played_trick(self.cards_played_trick),
+                                       }))
+
+                #add data from each card played as a tuple to the self.play_data list
+                #(card played, player, trump card id, card led, player bid, player tricks taken,
+                #player hand, all bids, all tricks taken, all tricks remaining, all cards played,
+                #hand number, cards played this trick, hand_result)
+
                 next_player = self.current_player.next_player
                 self.current_player = next_player
                 if self.current_player == first:
@@ -137,11 +158,6 @@ class Game:
             self.current_player = determine_trick_winner(self.cards_played_trick, self.trump)
             self.last_player = self.current_player.previous_player
             self.current_player.tricks_won += 1
-
-            self.cards_played_hand[self.tricks_left] = []
-
-            for player, card in self.cards_played_trick:
-                self.cards_played_hand[self.tricks_left].append((player.name,card.id))
 
             self.tricks_left -= 1
             #empty the cards played for the trick list after saving
@@ -162,10 +178,18 @@ class Game:
         #set first_bidder to left of dealer
         self.first_bidder = self.dealer.next_player
 
+
         #score hand and reset tricks won
         for player in self.player_list:
+            for observation in self.play_data:
+                if observation["player"] == player.name and player.bid == player.tricks_won and observation['hand_number'] == self.hand_number + 1:
+                    observation["hand_result"] = 1             
+
             if player.bid == player.tricks_won:
+                #update player hand score if player made bid
                 player.hand_score = 5 + player.tricks_won
+                #for each row in play_data list, update result if player made their bid
+
             else:
                 player.hand_score = 0
             self.scores[player.name] = player.hand_score
@@ -206,6 +230,9 @@ class Player:
         ##need to add logic to adjust bid if dealer
         if self.is_dealer and total_bids == total_tricks:
             self.bid += 1
+    
+    def get_hand(self):
+        return [card.id for card in self.hand]
 
 class Simulator:
     def play_game(self, player_names):
@@ -218,13 +245,18 @@ class Simulator:
 
         for player in self.game.player_list:
             print(f'{player.name}: {player.running_score}')
-    def export_results(self):
+    def export_hands_played(self):
         return self.game.results
+    
+    def export_cards_played(self):
+        return self.game.play_data
 
 sim = Simulator()
 sim.play_game(["Jack","Kelly","Tim","Mom","Dad"])
 
-df = pd.DataFrame([sim.export_results()])
+df = pd.DataFrame([sim.export_hands_played()])
+
+df = pd.DataFrame(sim.export_cards_played())
 
 save_path = r'output.csv'
 df.to_csv(save_path)
